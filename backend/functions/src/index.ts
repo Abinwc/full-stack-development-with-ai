@@ -14,7 +14,16 @@ const executeQuery = async (queryText: string, params: any[] = []) => {
 
     // Use the sql.query method for parameterized queries
     const result: any = await sql.query(queryText, params);
-    return result.rows;
+
+    // Log the entire result to see its structure
+    logger.info("Raw query result structure:", JSON.stringify(result));
+
+    // Defensive check - if result exists but doesn't have rows property
+    if (result && !result.rows && Array.isArray(result)) {
+      return result; // If result is directly an array, return that
+    }
+
+    return result?.rows || []; // Return rows or empty array
   } catch (error) {
     logger.error(
       "Database query error:",

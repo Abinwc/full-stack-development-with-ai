@@ -1,79 +1,96 @@
-import { initializeApp } from "firebase-admin/app";
+import { neon } from "@neondatabase/serverless";
 import * as logger from "firebase-functions/logger";
 import { defineString } from "firebase-functions/params";
 import { onCall } from "firebase-functions/v2/https";
-import pkg from "pg";
-const { Pool } = pkg;
 
-// Initialize Firebase Admin
-initializeApp();
+// Define environment variable for Neon connection string
+const NEON_CONNECTION_STRING = defineString("NEON_CONNECTION_STRING");
 
-// Define database URL configuration parameter
-const databaseUrl = defineString("database.url", {
-  description: "The URL of the PostgreSQL database.",
-});
+// Create a query executor function for parameterized queries
+const executeQuery = async (queryText: string, params: any[] = []) => {
+  try {
+    // Create SQL connection inside the function, not at module level
+    const sql = neon(NEON_CONNECTION_STRING.value());
 
-// Create a PostgreSQL pool
-const getPool = () => {
-  return new Pool({
-    connectionString: databaseUrl.value(),
-    ssl: {
-      rejectUnauthorized: false,
-    },
-  });
+    // Use the sql.query method for parameterized queries
+    const result: any = await sql.query(queryText, params);
+    return result.rows;
+  } catch (error) {
+    logger.error(
+      "Database query error:",
+      error instanceof Error ? error.message : String(error)
+    );
+    throw new Error("Database operation failed. Please try again later.");
+  }
 };
 
-// onCall function to get all projects
+// Function to get all projects
 export const getProjects = onCall(
   {
-    // Configure function settings
     memory: "256MiB",
     timeoutSeconds: 60,
-    minInstances: 0,
   },
   async (request) => {
     try {
-      logger.info("Fetching all projects", { structuredData: true });
+      logger.info("getProjects function called");
 
-      const pool = getPool();
-
-      // Query to get projects with their highlights
-      const projectQuery = `
-      SELECT 
-        p.id, 
-        p.name, 
-        p.type, 
-        p.achievement,
-        json_agg(
-          json_build_object(
-            'id', ph.id,
-            'highlight', ph.highlight
-          )
-        ) as highlights
+      const query = `
+      SELECT p.*, 
+             jsonb_agg(h.highlight) AS highlights
       FROM projects p
-      JOIN project_highlights ph ON p.id = ph.project_id
-      GROUP BY p.id, p.name, p.type, p.achievement
+      LEFT JOIN project_highlights h ON p.id = h.project_id
+      GROUP BY p.id
       ORDER BY p.id
     `;
 
-      const { rows } = await pool.query(projectQuery);
-      await pool.end();
+      const projects = await executeQuery(query);
 
-      return {
-        success: true,
-        data: rows,
-      };
-    } catch (error: any) {
-      logger.error("Database error when fetching projects:", error);
-
-      throw new Error(
-        `An error occurred while retrieving projects: ${error.message}`
+      return { success: true, data: projects };
+    } catch (error) {
+      logger.error(
+        "Error in getProjects:",
+        error instanceof Error ? error.message : String(error)
       );
+      throw new Error("Failed to retrieve projects");
     }
   }
 );
 
-// onCall function to get a specific project by ID
+// Function to get all experiences
+export const getExperiences = onCall(
+  {
+    memory: "256MiB",
+    timeoutSeconds: 60,
+  },
+  async (request) => {
+    try {
+      logger.info("getExperiences function called");
+
+      const query = `
+      SELECT e.*,
+             jsonb_agg(DISTINCT a.achievement) FILTER (WHERE a.achievement IS NOT NULL) AS achievements,
+             jsonb_agg(DISTINCT p.project) FILTER (WHERE p.project IS NOT NULL) AS projects
+      FROM experience e
+      LEFT JOIN experience_achievements a ON e.id = a.experience_id
+      LEFT JOIN experience_projects p ON e.id = p.experience_id
+      GROUP BY e.id
+      ORDER BY e.id
+    `;
+
+      const experiences = await executeQuery(query);
+
+      return { success: true, data: experiences };
+    } catch (error) {
+      logger.error(
+        "Error in getExperiences:",
+        error instanceof Error ? error.message : String(error)
+      );
+      throw new Error("Failed to retrieve experiences");
+    }
+  }
+);
+
+// Function to get a specific project by ID
 export const getProjectById = onCall(
   {
     memory: "256MiB",
@@ -81,122 +98,41 @@ export const getProjectById = onCall(
   },
   async (request) => {
     try {
-      const { projectId } = request.data;
+      const projectId = request.data.projectId;
 
       if (!projectId) {
-        throw new Error("The function must be called with a valid projectId.");
+        throw new Error("Project ID is required");
       }
 
-      logger.info(`Fetching project with ID: ${projectId}`, {
-        structuredData: true,
-      });
+      logger.info(`getProjectById function called for project ${projectId}`);
 
-      const pool = getPool();
-
-      const projectQuery = `
-      SELECT 
-        p.id, 
-        p.name, 
-        p.type, 
-        p.achievement,
-        json_agg(
-          json_build_object(
-            'id', ph.id,
-            'highlight', ph.highlight
-          )
-        ) as highlights
+      const query = `
+      SELECT p.*, 
+             jsonb_agg(h.highlight) FILTER (WHERE h.highlight IS NOT NULL) AS highlights
       FROM projects p
-      JOIN project_highlights ph ON p.id = ph.project_id
+      LEFT JOIN project_highlights h ON p.id = h.project_id
       WHERE p.id = $1
-      GROUP BY p.id, p.name, p.type, p.achievement
+      GROUP BY p.id
     `;
 
-      const { rows } = await pool.query(projectQuery, [projectId]);
-      await pool.end();
+      const projects = await executeQuery(query, [projectId]);
 
-      if (rows.length === 0) {
+      if (projects.length === 0) {
         throw new Error("Project not found");
       }
 
-      return {
-        success: true,
-        data: rows[0],
-      };
-    } catch (error: any) {
-      logger.error(`Error retrieving project: ${error.message}`);
-      throw new Error(
-        error.message || "An error occurred while retrieving the project"
+      return { success: true, data: projects[0] };
+    } catch (error) {
+      logger.error(
+        "Error in getProjectById:",
+        error instanceof Error ? error.message : String(error)
       );
+      throw new Error("Failed to retrieve project");
     }
   }
 );
 
-// onCall function to get all experience entries
-export const getExperience = onCall(
-  {
-    memory: "256MiB",
-    timeoutSeconds: 60,
-  },
-  async (request) => {
-    try {
-      logger.info("Fetching all experience entries", { structuredData: true });
-
-      const pool = getPool();
-
-      // Query to get experience with achievements and projects
-      const experienceQuery = `
-      SELECT 
-        e.id, 
-        e.company, 
-        e.role, 
-        e.description,
-        (
-          SELECT json_agg(
-            json_build_object(
-              'id', ea.id,
-              'achievement', ea.achievement
-            )
-          )
-          FROM experience_achievements ea
-          WHERE ea.experience_id = e.id
-        ) as achievements,
-        (
-          SELECT json_agg(
-            json_build_object(
-              'id', ep.id,
-              'project', ep.project
-            )
-          )
-          FROM experience_projects ep
-          WHERE ep.experience_id = e.id
-        ) as projects
-      FROM experience e
-      ORDER BY e.id
-    `;
-
-      const { rows } = await pool.query(experienceQuery);
-      await pool.end();
-
-      // Handle null arrays (convert to empty arrays)
-      rows.forEach((row) => {
-        if (row.achievements === null) row.achievements = [];
-        if (row.projects === null) row.projects = [];
-      });
-
-      return {
-        success: true,
-        data: rows,
-      };
-    } catch (error: any) {
-      logger.error("Database error when fetching experience:", error);
-      throw new Error(
-        `An error occurred while retrieving experience data: ${error.message}`
-      );
-    }
-  }
-);
-
-// onCall function to get a specific experience entry by ID
+// Function to get a specific experience by ID
 export const getExperienceById = onCall(
   {
     memory: "256MiB",
@@ -204,141 +140,40 @@ export const getExperienceById = onCall(
   },
   async (request) => {
     try {
-      const { experienceId } = request.data;
+      const experienceId = request.data.experienceId;
 
       if (!experienceId) {
-        throw new Error(
-          "The function must be called with a valid experienceId."
-        );
+        throw new Error("Experience ID is required");
       }
 
-      logger.info(`Fetching experience with ID: ${experienceId}`, {
-        structuredData: true,
-      });
+      logger.info(
+        `getExperienceById function called for experience ${experienceId}`
+      );
 
-      const pool = getPool();
-
-      const experienceQuery = `
-      SELECT 
-        e.id, 
-        e.company, 
-        e.role, 
-        e.description,
-        (
-          SELECT json_agg(
-            json_build_object(
-              'id', ea.id,
-              'achievement', ea.achievement
-            )
-          )
-          FROM experience_achievements ea
-          WHERE ea.experience_id = e.id
-        ) as achievements,
-        (
-          SELECT json_agg(
-            json_build_object(
-              'id', ep.id,
-              'project', ep.project
-            )
-          )
-          FROM experience_projects ep
-          WHERE ep.experience_id = e.id
-        ) as projects
+      const query = `
+      SELECT e.*,
+             jsonb_agg(DISTINCT a.achievement) FILTER (WHERE a.achievement IS NOT NULL) AS achievements,
+             jsonb_agg(DISTINCT p.project) FILTER (WHERE p.project IS NOT NULL) AS projects
       FROM experience e
+      LEFT JOIN experience_achievements a ON e.id = a.experience_id
+      LEFT JOIN experience_projects p ON e.id = p.experience_id
       WHERE e.id = $1
+      GROUP BY e.id
     `;
 
-      const { rows } = await pool.query(experienceQuery, [experienceId]);
-      await pool.end();
+      const experiences = await executeQuery(query, [experienceId]);
 
-      if (rows.length === 0) {
+      if (experiences.length === 0) {
         throw new Error("Experience not found");
       }
 
-      // Handle null arrays
-      if (rows[0].achievements === null) rows[0].achievements = [];
-      if (rows[0].projects === null) rows[0].projects = [];
-
-      return {
-        success: true,
-        data: rows[0],
-      };
-    } catch (error: any) {
-      logger.error(`Error retrieving experience: ${error.message}`);
-      throw new Error(
-        error.message || "An error occurred while retrieving the experience"
+      return { success: true, data: experiences[0] };
+    } catch (error) {
+      logger.error(
+        "Error in getExperienceById:",
+        error instanceof Error ? error.message : String(error)
       );
-    }
-  }
-);
-
-// Example of adding a project using onCall
-export const addProject = onCall(
-  {
-    memory: "256MiB",
-    timeoutSeconds: 60,
-    // Optional: Require authentication
-    // enforceAppCheck: true,
-  },
-  async (request) => {
-    try {
-      // Authentication check (optional)
-      // if (!request.auth) {
-      //   throw new Error('The function must be called while authenticated.');
-      // }
-
-      const { name, type, achievement, highlights } = request.data;
-
-      if (!name || !type || !highlights || !Array.isArray(highlights)) {
-        throw new Error(
-          "The function must be called with valid project data: name, type, and highlights array."
-        );
-      }
-
-      logger.info("Adding new project", { name, type, structuredData: true });
-
-      const pool = getPool();
-
-      // Start a transaction
-      const client = await pool.connect();
-      try {
-        await client.query("BEGIN");
-
-        // Insert project
-        const projectResult = await client.query(
-          "INSERT INTO projects (name, type, achievement) VALUES ($1, $2, $3) RETURNING id",
-          [name, type, achievement]
-        );
-
-        const projectId = projectResult.rows[0].id;
-
-        // Insert highlights
-        for (const highlight of highlights) {
-          await client.query(
-            "INSERT INTO project_highlights (project_id, highlight) VALUES ($1, $2)",
-            [projectId, highlight]
-          );
-        }
-
-        await client.query("COMMIT");
-
-        return {
-          success: true,
-          message: "Project created successfully",
-          projectId,
-        };
-      } catch (error) {
-        await client.query("ROLLBACK");
-        throw error;
-      } finally {
-        client.release();
-        await pool.end();
-      }
-    } catch (error: any) {
-      logger.error(`Error adding project: ${error.message}`);
-      throw new Error(
-        error.message || "An error occurred while adding the project"
-      );
+      throw new Error("Failed to retrieve experience");
     }
   }
 );

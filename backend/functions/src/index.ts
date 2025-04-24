@@ -10,8 +10,7 @@ initializeApp();
 
 // Define database URL configuration parameter
 const databaseUrl = defineString("database.url", {
-  description:
-    "postgresql://neondb_owner:npg_cvuoMde6f1Yt@ep-raspy-snow-a1zmy7aw-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require",
+  description: "The URL of the PostgreSQL database.",
 });
 
 // Create a PostgreSQL pool

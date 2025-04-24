@@ -5,10 +5,10 @@ import { Component, HostListener, OnInit } from '@angular/core';
   selector: 'app-root',
   standalone: true,
   imports: [CommonModule],
-  templateUrl: './my-portfolio.component.html',
-  styleUrls: ['./my-portfolio.component.css'],
+  templateUrl: './personal-portfolio.component.html',
+  styleUrls: ['./personal-portfolio.component.css'],
 })
-export class MyPortfolioComponent implements OnInit {
+export class PersonalPortfolioComponent implements OnInit {
   mobileMenuOpen = false;
   currentYear = new Date().getFullYear();
 

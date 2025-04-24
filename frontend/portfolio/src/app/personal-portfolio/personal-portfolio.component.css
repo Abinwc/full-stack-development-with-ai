@@ -1,0 +1,28 @@
+:host {
+  font-family: "Inter", sans-serif;
+  color: #333;
+  display: block;
+}
+
+.container {
+  max-width: 1200px;
+}
+
+section {
+  scroll-margin-top: 80px;
+}
+
+h2 {
+  position: relative;
+}
+
+h2:after {
+  content: "";
+  position: absolute;
+  width: 60px;
+  height: 4px;
+  background-color: #3b82f6;
+  bottom: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+}

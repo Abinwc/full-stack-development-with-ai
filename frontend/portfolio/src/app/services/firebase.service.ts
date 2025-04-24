@@ -10,9 +10,14 @@ export class FirebaseService {
 
   // Get all projects
   getProjects(): Observable<any> {
+    console.log('Calling Firebase getProjects function');
     const getProjectsFunction = httpsCallable(this.functions, 'getProjects');
     return from(getProjectsFunction()).pipe(
-      map((result: any) => result.data)
+      map((result: any) => {
+        console.log('Raw result from getProjects:', result);
+        console.log('Result data:', result.data, "GetProjects");
+        return result.data;
+      })
     );
   }
 

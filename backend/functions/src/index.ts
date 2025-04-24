@@ -43,7 +43,15 @@ export const getProjects = onCall(
       ORDER BY p.id
     `;
 
+      logger.info("Executing query:", query);
       const projects = await executeQuery(query);
+      logger.info("Query results:", JSON.stringify(projects));
+
+      // Check if projects is empty or null
+      if (!projects || projects.length === 0) {
+        logger.info("No projects found in database");
+        return { success: true, data: [] };
+      }
 
       return { success: true, data: projects };
     } catch (error) {

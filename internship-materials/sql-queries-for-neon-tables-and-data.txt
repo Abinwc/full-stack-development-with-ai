@@ -1,0 +1,98 @@
+-- Create the experience table
+CREATE TABLE experience (
+    id SERIAL PRIMARY KEY,
+    company VARCHAR(255) NOT NULL,
+    role VARCHAR(255) NOT NULL,
+    description TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create the experience_achievements table for the one-to-many relationship
+CREATE TABLE experience_achievements (
+    id SERIAL PRIMARY KEY,
+    experience_id INTEGER NOT NULL,
+    achievement TEXT NOT NULL,
+    FOREIGN KEY (experience_id) REFERENCES experience(id) ON DELETE CASCADE
+);
+
+-- Create the experience_projects table for Techcora projects
+CREATE TABLE experience_projects (
+    id SERIAL PRIMARY KEY,
+    experience_id INTEGER NOT NULL,
+    project TEXT NOT NULL,
+    FOREIGN KEY (experience_id) REFERENCES experience(id) ON DELETE CASCADE
+);
+
+-- Create the projects table
+CREATE TABLE projects (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    type VARCHAR(255) NOT NULL,
+    achievement TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create the project_highlights table for the one-to-many relationship
+CREATE TABLE project_highlights (
+    id SERIAL PRIMARY KEY,
+    project_id INTEGER NOT NULL,
+    highlight TEXT NOT NULL,
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+
+-- Insert data into experience table
+INSERT INTO experience (company, role, description)
+VALUES 
+    ('Surfboard Payments', 'Software Engineer', 'Fin-tech company revolutionising payment industry'),
+    ('Techcora Corporation', 'Entrepreneur / Software Engineer', 'Software Development Company');
+
+-- Insert achievements for Surfboard Payments
+INSERT INTO experience_achievements (experience_id, achievement)
+VALUES
+    (1, 'Successfully spearheaded a KYB (Know Your Business) project that revolutionized the onboarding process for global companies. Achieved an outstanding 85% reduction in onboarding time by implementing automation, streamlining the process from 20 minutes to just 3 minutes'),
+    (1, 'Integrated Klarna payment method into the payment options offered, enhancing the user experience by providing a seamless and efficient payment process'),
+    (1, 'Involved in the successful development of the checkout layer, which involved the efficient handling of orders from point-of-sale (POS) systems and managing transaction records of customers using our products'),
+    (1, 'Skilled at working with different digital ID verification systems and company data providers'),
+    (1, 'Successfully recruited and led a team of 4 graduates straight out of college. Provided effective mentorship resulting in one team member being promoted to the role of team lead'),
+    (1, 'Experienced in utilising Linear, Notion, and Asana for effective project management'),
+    (1, 'Proficiently utilised NestJS, TypeScript and SQL to develop and deliver successful projects');
+
+-- Insert project for Techcora
+INSERT INTO experience_projects (experience_id, project)
+VALUES
+    (2, 'Wild Eye product which can be useful for agriculture and forest development');
+
+-- Insert achievements for Techcora
+INSERT INTO experience_achievements (experience_id, achievement)
+VALUES
+    (2, 'Focused on the Wild Eye project, aiming to mitigate animal raids on crops, resolve human-wildlife conflicts, and prevent animal accidents on railway lines'),
+    (2, 'Training interested candidates in software engineering fundamentals by regularly conducting 6 week internship programs. 50+ students have benefited from this so far');
+
+-- Insert data into projects table
+INSERT INTO projects (name, type, achievement)
+VALUES
+    ('Chikpuk', 'Quick Commerce Application', '20% increase in sales in the first six months'),
+    ('Elegance', 'Salon billing, appointments and subscriptions ERP', '30% increase in first-time clients and more');
+
+-- Insert highlights for Chikpuk
+INSERT INTO project_highlights (project_id, highlight)
+VALUES
+    (1, 'Developed and launched a quick commerce marketplace platform that increased merchant sales by 20% within the first six months'),
+    (1, 'Engineered a highly scalable infrastructure, enabling seamless onboarding of multiple merchants'),
+    (1, 'Designed and implemented a world-class UI/UX, leading to exceptional user satisfaction'),
+    (1, 'Utilized data-driven strategies to optimize product listings and promotions'),
+    (1, 'Integrated advanced analytics tools to monitor performance metrics'),
+    (1, 'Implemented agile methodologies, reducing development cycles and accelerating time-to-market');
+
+-- Insert highlights for Elegance
+INSERT INTO project_highlights (project_id, highlight)
+VALUES
+    (2, 'Developed a comprehensive billing software tailored for a salon client'),
+    (2, 'Integrated customer subscription management, enabling the salon to offer membership plans'),
+    (2, 'Implemented employee performance tracking system'),
+    (2, 'Designed an intuitive appointment booking system'),
+    (2, 'Created a dual-interface solution with public web application and administrative dashboard'),
+    (2, 'Revenue Growth: Salon experienced up to a 20% increase in overall revenue'),
+    (2, 'Customer Retention: Client retention rates improved by approximately 25%');
